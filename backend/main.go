@@ -22,14 +22,14 @@ func main() {
 	http.HandleFunc("/api/hello", func(w http.ResponseWriter, r *http.Request) {
 		// CORS設定（Viteからのアクセスを許可）
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		
+
 		var msg string
 		err := db.QueryRow("SELECT content FROM message LIMIT 1").Scan(&msg)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]string{"message": msg+"sdfsdf"})
+		json.NewEncoder(w).Encode(map[string]string{"message": msg + "sdfsdf"})
 	})
 
 	fmt.Println("Server starting at :8080...")
