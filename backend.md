@@ -64,3 +64,21 @@ backend/
 │   └── user/
 └── main.go
 ```
+機能ごとにパッケージを分けた。
+それぞれのpackageにservice.go, repo.go, controller.goのようなファイルを作る。
+
+## 実装のこだわり
+### Password Hash
+Argon2を使用した。下のサイトを参考にパラメータを設定した。
+最小構成としてメモリ19Mib, 反復回数2, 並列度1。
+[OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id)
+```
+実際のコード
+```
+> これらの構成設定は同等のレベルの防御を提供し、唯一の違いはCPUとRAMの使用量のトレードオフです。
+  より、パフォーマンスに問題があれば、パラメータを変更するかも。
+
+また、ソルトも追加した。
+[参考記事](https://qiita.com/ockeghem/items/d7324d383fb7c104af58)
+[同じく](https://developer.mozilla.org/ja/docs/Glossary/Salt)
+[ソルトの長さ](https://github.com/alexedwards/argon2id#changing-the-parameters)
