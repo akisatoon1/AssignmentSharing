@@ -25,7 +25,7 @@ func NewService(repo Repository) *Service {
 }
 
 func (s *Service) Create(username string, password string) error {
-	hash, salt, err := hashPassword(password)
+	hash, salt, err := hashAndSalt(password)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func (s *Service) Create(username string, password string) error {
 	return s.repo.Save(usr)
 }
 
-func hashPassword(password string) (passwdHash string, passwdSalt string, errr error) {
+func hashAndSalt(password string) (passwdHash string, passwdSalt string, errr error) {
 	salt := make([]byte, 16)
 	_, err := rand.Read(salt)
 	if err != nil {
