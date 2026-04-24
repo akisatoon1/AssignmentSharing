@@ -29,7 +29,7 @@ func (s *Service) Create(username string, password string) error {
 	if err != nil {
 		return err
 	}
-	usr := &User{
+	usr := User{
 		Username:     username,
 		PasswordHash: hash,
 		PasswordSalt: salt,
