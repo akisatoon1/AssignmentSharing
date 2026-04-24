@@ -1,5 +1,5 @@
 package user
 
 type Repository interface {
-	Save(user *User) error
+	Save(usr *User) error
 }
