@@ -20,6 +20,10 @@ type Service struct {
 	repo Repository
 }
 
+func NewService(repo Repository) *Service {
+	return &Service{repo: repo}
+}
+
 func (s *Service) Create(username string, password string) error {
 	hash, salt, err := hashPassword(password)
 	if err != nil {
