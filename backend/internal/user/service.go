@@ -17,7 +17,7 @@ type User struct {
 }
 
 type Service struct {
-	repo UserRepository
+	repo Repository
 }
 
 func (s *Service) Create(username string, password string) error {
