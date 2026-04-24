@@ -1,42 +1,42 @@
 package user
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"time"
-
-	"golang.org/x/crypto/argon2"
 )
 
 type User struct {
 	ID           int64
 	Username     string
 	PasswordHash string
-	PasswordSalt string
 	CreatedAt    time.Time
 }
 
 type Service struct {
-	repo Repository
+	repo          Repository
+	hashGenerator HashGenerator
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository, hashGenerator HashGenerator) *Service {
+	return &Service{repo: repo, hashGenerator: hashGenerator}
+}
+
+type HashGenerator interface {
+	GenerateFromPassword(password string) (hash string, err error)
 }
 
 func (s *Service) Create(username string, password string) error {
-	hash, salt, err := hashAndSalt(password)
+	hash, err := s.hashGenerator.GenerateFromPassword(password)
 	if err != nil {
 		return err
 	}
 	usr := User{
 		Username:     username,
 		PasswordHash: hash,
-		PasswordSalt: salt,
 	}
 	return s.repo.Save(usr)
 }
 
+/*
 func hashAndSalt(password string) (passwdHash string, passwdSalt string, errr error) {
 	salt := make([]byte, 16)
 	_, err := rand.Read(salt)
@@ -54,3 +54,4 @@ func hashAndSalt(password string) (passwdHash string, passwdSalt string, errr er
 	hash := argon2.IDKey([]byte(password), salt, iterationTime, memory, threads, keyLen)
 	return base64.StdEncoding.EncodeToString(hash), base64.StdEncoding.EncodeToString(salt), nil
 }
+*/
