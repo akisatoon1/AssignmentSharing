@@ -1,7 +1,18 @@
 package user
 
 import (
+	"errors"
+	"strings"
 	"time"
+	"unicode"
+)
+
+const minPasswordLength = 8
+
+var (
+	ErrUsernameRequired = errors.New("username is required")
+	ErrUsernameInvalid  = errors.New("username cannot contain whitespace")
+	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
 )
 
 type User struct {
@@ -25,6 +36,15 @@ type HashGenerator interface {
 }
 
 func (s *Service) Create(username string, password string) error {
+	if username == "" {
+		return ErrUsernameRequired
+	}
+	if strings.ContainsFunc(username, unicode.IsSpace) {
+		return ErrUsernameInvalid
+	}
+	if len(password) < minPasswordLength {
+		return ErrPasswordTooShort
+	}
 	hash, err := s.hashGenerator.GenerateFromPassword(password)
 	if err != nil {
 		return err
