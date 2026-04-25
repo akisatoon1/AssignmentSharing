@@ -55,23 +55,3 @@ func (s *Service) Create(username string, password string) error {
 	}
 	return s.repo.Save(usr)
 }
-
-/*
-func hashAndSalt(password string) (passwdHash string, passwdSalt string, errr error) {
-	salt := make([]byte, 16)
-	_, err := rand.Read(salt)
-	if err != nil {
-		return "", "", err
-	}
-
-	// ハッシュアルゴリズムの強度を設定するためのパラメータ
-	iterationTime := uint32(2)
-	memory := uint32(19 * 1024) // KiB単位なので19Mibになる
-	threads := uint8(4)
-
-	keyLen := uint32(32)
-
-	hash := argon2.IDKey([]byte(password), salt, iterationTime, memory, threads, keyLen)
-	return base64.StdEncoding.EncodeToString(hash), base64.StdEncoding.EncodeToString(salt), nil
-}
-*/
