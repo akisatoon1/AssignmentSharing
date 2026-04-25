@@ -53,5 +53,5 @@ func (s *Service) Create(username string, password string) error {
 		Username:     username,
 		PasswordHash: hash,
 	}
-	return s.repo.Save(usr)
+	return s.repo.Create(usr)
 }

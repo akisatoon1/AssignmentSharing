@@ -10,7 +10,7 @@ type RepositoryMock struct {
 	mock.Mock
 }
 
-func (r *RepositoryMock) Save(usr user.User) error {
+func (r *RepositoryMock) Create(usr user.User) error {
 	args := r.Called(usr)
 	return args.Error(0)
 }
