@@ -166,3 +166,134 @@ func TestUpdateUsername(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdatePassword(t *testing.T) {
+	hashErr := errors.New("hash generator error")
+	repoErr := errors.New("repository error")
+	compareErr := errors.New("compare error")
+
+	currentUser := user.User{ID: 1, PasswordHash: "currenthash"}
+
+	tests := []struct {
+		name        string
+		id          int64
+		oldPassword string
+		newPassword string
+		setupMocks  func(repo *RepositoryMock, hash *HashGeneratorMock)
+		expectedErr error
+	}{
+		{
+			name:        "Success: Valid update",
+			id:          1,
+			oldPassword: "oldpassword",
+			newPassword: "newpassword",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(currentUser, nil)
+				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
+				hash.On("GenerateFromPassword", "newpassword").Return("newhash", nil)
+				repo.On("Save", user.User{ID: 1, PasswordHash: "newhash"}).Return(nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:        "Error: Repository FindByID failure",
+			id:          1,
+			oldPassword: "oldpassword",
+			newPassword: "newpassword",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(user.User{}, repoErr)
+			},
+			expectedErr: repoErr,
+		},
+		{
+			name:        "Error: Invalid old password",
+			id:          1,
+			oldPassword: "wrongpassword",
+			newPassword: "newpassword",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(currentUser, nil)
+				hash.On("CompareHashAndPassword", "currenthash", "wrongpassword").Return(compareErr)
+			},
+			expectedErr: user.ErrInvalidPassword,
+		},
+		{
+			name:        "Error: New password too short (Empty)",
+			id:          1,
+			oldPassword: "oldpassword",
+			newPassword: "",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(currentUser, nil)
+				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
+			},
+			expectedErr: user.ErrPasswordTooShort,
+		},
+		{
+			name:        "Error: New password too short (5 chars)",
+			id:          1,
+			oldPassword: "oldpassword",
+			newPassword: "short",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(currentUser, nil)
+				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
+			},
+			expectedErr: user.ErrPasswordTooShort,
+		},
+		{
+			name:        "Error: New password too short (7 chars)",
+			id:          1,
+			oldPassword: "oldpassword",
+			newPassword: "shorter",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(currentUser, nil)
+				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
+			},
+			expectedErr: user.ErrPasswordTooShort,
+		},
+		{
+			name:        "Error: Hash generator failure",
+			id:          1,
+			oldPassword: "oldpassword",
+			newPassword: "newpassword",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(currentUser, nil)
+				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
+				hash.On("GenerateFromPassword", "newpassword").Return("", hashErr)
+			},
+			expectedErr: hashErr,
+		},
+		{
+			name:        "Error: Repository save failure",
+			id:          1,
+			oldPassword: "oldpassword",
+			newPassword: "newpassword",
+			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+				repo.On("FindByID", int64(1)).Return(currentUser, nil)
+				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
+				hash.On("GenerateFromPassword", "newpassword").Return("newhash", nil)
+				repo.On("Save", mock.Anything).Return(repoErr)
+			},
+			expectedErr: repoErr,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hashGenerator := &HashGeneratorMock{}
+			repo := &RepositoryMock{}
+			hashGenerator.Test(t)
+			repo.Test(t)
+
+			if tc.setupMocks != nil {
+				tc.setupMocks(repo, hashGenerator)
+			}
+
+			srv := user.NewService(repo, hashGenerator)
+			err := srv.UpdatePassword(tc.id, tc.oldPassword, tc.newPassword)
+
+			assert.ErrorIs(t, err, tc.expectedErr)
+
+			hashGenerator.AssertExpectations(t)
+			repo.AssertExpectations(t)
+		})
+	}
+}
