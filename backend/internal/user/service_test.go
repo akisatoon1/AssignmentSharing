@@ -17,14 +17,14 @@ func TestCreate(t *testing.T) {
 		name        string
 		username    string
 		password    string
-		setupMocks  func(repo *RepositoryMock, hash *HashGeneratorMock)
+		setupMocks  func(repo *RepositoryMock, hash *PasswordHasherMock)
 		expectedErr error
 	}{
 		{
 			name:     "Success: Valid user creation",
 			username: "testuser",
 			password: "password",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				hash.On("GenerateFromPassword", "password").Return("thisisHaaash!", nil)
 				repo.On("Create", user.User{Username: "testuser", PasswordHash: "thisisHaaash!"}).Return(nil)
 			},
@@ -62,7 +62,7 @@ func TestCreate(t *testing.T) {
 			name:     "Error: Hash generator failure",
 			username: "testuser",
 			password: "password",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				hash.On("GenerateFromPassword", "password").Return("", hashErr)
 			},
 			expectedErr: hashErr,
@@ -71,7 +71,7 @@ func TestCreate(t *testing.T) {
 			name:     "Error: Repository save failure",
 			username: "testuser",
 			password: "password",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				hash.On("GenerateFromPassword", "password").Return("thisisHaaash!", nil)
 				repo.On("Create", mock.Anything).Return(repoErr)
 			},
@@ -81,7 +81,7 @@ func TestCreate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hashGenerator := &HashGeneratorMock{}
+			hashGenerator := &PasswordHasherMock{}
 			repo := &RepositoryMock{}
 			hashGenerator.Test(t)
 			repo.Test(t)
@@ -147,7 +147,7 @@ func TestUpdateUsername(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hashGenerator := &HashGeneratorMock{}
+			hashGenerator := &PasswordHasherMock{}
 			repo := &RepositoryMock{}
 			hashGenerator.Test(t)
 			repo.Test(t)
@@ -179,7 +179,7 @@ func TestUpdatePassword(t *testing.T) {
 		id          int64
 		oldPassword string
 		newPassword string
-		setupMocks  func(repo *RepositoryMock, hash *HashGeneratorMock)
+		setupMocks  func(repo *RepositoryMock, hash *PasswordHasherMock)
 		expectedErr error
 	}{
 		{
@@ -187,7 +187,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 				hash.On("GenerateFromPassword", "newpassword").Return("newhash", nil)
@@ -200,7 +200,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(user.User{}, repoErr)
 			},
 			expectedErr: repoErr,
@@ -210,7 +210,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "wrongpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "wrongpassword").Return(compareErr)
 			},
@@ -221,7 +221,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
@@ -232,7 +232,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "short",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
@@ -243,7 +243,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "shorter",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
@@ -254,7 +254,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 				hash.On("GenerateFromPassword", "newpassword").Return("", hashErr)
@@ -266,7 +266,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
+			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 				hash.On("GenerateFromPassword", "newpassword").Return("newhash", nil)
@@ -278,7 +278,7 @@ func TestUpdatePassword(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hashGenerator := &HashGeneratorMock{}
+			hashGenerator := &PasswordHasherMock{}
 			repo := &RepositoryMock{}
 			hashGenerator.Test(t)
 			repo.Test(t)

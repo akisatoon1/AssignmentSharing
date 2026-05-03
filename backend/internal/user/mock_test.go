@@ -25,16 +25,16 @@ func (r *RepositoryMock) FindByID(id int64) (user.User, error) {
 	return args.Get(0).(user.User), args.Error(1)
 }
 
-type HashGeneratorMock struct {
+type PasswordHasherMock struct {
 	mock.Mock
 }
 
-func (h *HashGeneratorMock) GenerateFromPassword(password string) (string, error) {
+func (h *PasswordHasherMock) GenerateFromPassword(password string) (string, error) {
 	args := h.Called(password)
 	return args.String(0), args.Error(1)
 }
 
-func (h *HashGeneratorMock) CompareHashAndPassword(hash, password string) error {
+func (h *PasswordHasherMock) CompareHashAndPassword(hash, password string) error {
 	args := h.Called(hash, password)
 	return args.Error(0)
 }
