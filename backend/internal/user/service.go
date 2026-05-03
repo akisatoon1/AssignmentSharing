@@ -7,13 +7,11 @@ import (
 	"unicode"
 )
 
-const minPasswordLength = 8
-
 var (
 	ErrUsernameRequired = errors.New("username is required")
 	ErrUsernameInvalid  = errors.New("username cannot contain whitespace")
 	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
-	ErrUserNotFound     = errors.New("user not found")
+	ErrInvalidPassword  = errors.New("invalid password")
 )
 
 type User struct {
@@ -34,6 +32,7 @@ func NewService(repo Repository, hashGenerator HashGenerator) *Service {
 
 type HashGenerator interface {
 	GenerateFromPassword(password string) (hash string, err error)
+	CompareHashAndPassword(hash, password string) error
 }
 
 func validateUsername(username string) error {
@@ -46,12 +45,20 @@ func validateUsername(username string) error {
 	return nil
 }
 
+func validatePassword(password string) error {
+	const minPasswordLength = 8
+	if len(password) < minPasswordLength {
+		return ErrPasswordTooShort
+	}
+	return nil
+}
+
 func (s *Service) Create(username string, password string) error {
 	if err := validateUsername(username); err != nil {
 		return err
 	}
-	if len(password) < minPasswordLength {
-		return ErrPasswordTooShort
+	if err := validatePassword(password); err != nil {
+		return err
 	}
 	hash, err := s.hashGenerator.GenerateFromPassword(password)
 	if err != nil {
@@ -73,4 +80,22 @@ func (s *Service) UpdateUsername(id int64, newUsername string) error {
 		Username: newUsername,
 	}
 	return s.repo.Save(usr)
+}
+
+func (s *Service) UpdatePassword(id int64, oldPassword, newPassword string) error {
+	usr, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+	if err := s.hashGenerator.CompareHashAndPassword(usr.PasswordHash, oldPassword); err != nil {
+		return ErrInvalidPassword
+	}
+	if err := validatePassword(newPassword); err != nil {
+		return err
+	}
+	hash, err := s.hashGenerator.GenerateFromPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	return s.repo.Save(User{ID: id, PasswordHash: hash})
 }
