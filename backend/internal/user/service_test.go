@@ -9,6 +9,26 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func runTest(t *testing.T, setupMock func(*RepositoryMock, *PasswordHasherMock), run func(*user.Service) error, expectedErr error) {
+	t.Helper()
+
+	repo := &RepositoryMock{}
+	hash := &PasswordHasherMock{}
+	repo.Test(t)
+	hash.Test(t)
+
+	if setupMock != nil {
+		setupMock(repo, hash)
+	}
+
+	srv := user.NewService(repo, hash)
+	err := run(srv)
+
+	assert.ErrorIs(t, err, expectedErr)
+	repo.AssertExpectations(t)
+	hash.AssertExpectations(t)
+}
+
 func TestCreate(t *testing.T) {
 	hashErr := errors.New("hash generator error")
 	repoErr := errors.New("repository error")
@@ -17,14 +37,14 @@ func TestCreate(t *testing.T) {
 		name        string
 		username    string
 		password    string
-		setupMocks  func(repo *RepositoryMock, hash *PasswordHasherMock)
+		setupMock   func(*RepositoryMock, *PasswordHasherMock)
 		expectedErr error
 	}{
 		{
 			name:     "Success: Valid user creation",
 			username: "testuser",
 			password: "password",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				hash.On("GenerateFromPassword", "password").Return("thisisHaaash!", nil)
 				repo.On("Create", user.User{Username: "testuser", PasswordHash: "thisisHaaash!"}).Return(nil)
 			},
@@ -34,35 +54,31 @@ func TestCreate(t *testing.T) {
 			name:        "Error: Empty username",
 			username:    "",
 			password:    "password123",
-			setupMocks:  nil,
 			expectedErr: user.ErrUsernameRequired,
 		},
 		{
 			name:        "Error: Username contains space",
 			username:    "test user",
 			password:    "password123",
-			setupMocks:  nil,
 			expectedErr: user.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Password too short (7 chars)",
 			username:    "testuser",
 			password:    "1234567",
-			setupMocks:  nil,
 			expectedErr: user.ErrPasswordTooShort,
 		},
 		{
 			name:        "Error: Password too short (empty)",
 			username:    "testuser",
 			password:    "",
-			setupMocks:  nil,
 			expectedErr: user.ErrPasswordTooShort,
 		},
 		{
 			name:     "Error: Hash generator failure",
 			username: "testuser",
 			password: "password",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(_ *RepositoryMock, hash *PasswordHasherMock) {
 				hash.On("GenerateFromPassword", "password").Return("", hashErr)
 			},
 			expectedErr: hashErr,
@@ -71,7 +87,7 @@ func TestCreate(t *testing.T) {
 			name:     "Error: Repository save failure",
 			username: "testuser",
 			password: "password",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				hash.On("GenerateFromPassword", "password").Return("thisisHaaash!", nil)
 				repo.On("Create", mock.Anything).Return(repoErr)
 			},
@@ -81,22 +97,9 @@ func TestCreate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hashGenerator := &PasswordHasherMock{}
-			repo := &RepositoryMock{}
-			hashGenerator.Test(t)
-			repo.Test(t)
-
-			if tc.setupMocks != nil {
-				tc.setupMocks(repo, hashGenerator)
-			}
-
-			srv := user.NewService(repo, hashGenerator)
-			err := srv.Create(tc.username, tc.password)
-
-			assert.ErrorIs(t, err, tc.expectedErr)
-
-			hashGenerator.AssertExpectations(t)
-			repo.AssertExpectations(t)
+			runTest(t, tc.setupMock, func(srv *user.Service) error {
+				return srv.Create(tc.username, tc.password)
+			}, tc.expectedErr)
 		})
 	}
 }
@@ -108,14 +111,14 @@ func TestUpdateUsername(t *testing.T) {
 		name        string
 		id          int64
 		newUsername string
-		setupMocks  func(repo *RepositoryMock)
+		setupMock   func(*RepositoryMock, *PasswordHasherMock)
 		expectedErr error
 	}{
 		{
 			name:        "Success: Valid update",
 			id:          1,
 			newUsername: "newname",
-			setupMocks: func(repo *RepositoryMock) {
+			setupMock: func(repo *RepositoryMock, _ *PasswordHasherMock) {
 				repo.On("Save", user.User{ID: 1, Username: "newname"}).Return(nil)
 			},
 			expectedErr: nil,
@@ -124,21 +127,19 @@ func TestUpdateUsername(t *testing.T) {
 			name:        "Error: Empty username",
 			id:          1,
 			newUsername: "",
-			setupMocks:  nil,
 			expectedErr: user.ErrUsernameRequired,
 		},
 		{
 			name:        "Error: Username contains space",
 			id:          1,
 			newUsername: "new name",
-			setupMocks:  nil,
 			expectedErr: user.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Repository failure",
 			id:          1,
 			newUsername: "newname",
-			setupMocks: func(repo *RepositoryMock) {
+			setupMock: func(repo *RepositoryMock, _ *PasswordHasherMock) {
 				repo.On("Save", user.User{ID: 1, Username: "newname"}).Return(repoErr)
 			},
 			expectedErr: repoErr,
@@ -147,22 +148,9 @@ func TestUpdateUsername(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hashGenerator := &PasswordHasherMock{}
-			repo := &RepositoryMock{}
-			hashGenerator.Test(t)
-			repo.Test(t)
-
-			if tc.setupMocks != nil {
-				tc.setupMocks(repo)
-			}
-
-			srv := user.NewService(repo, hashGenerator)
-			err := srv.UpdateUsername(tc.id, tc.newUsername)
-
-			assert.ErrorIs(t, err, tc.expectedErr)
-
-			hashGenerator.AssertExpectations(t)
-			repo.AssertExpectations(t)
+			runTest(t, tc.setupMock, func(srv *user.Service) error {
+				return srv.UpdateUsername(tc.id, tc.newUsername)
+			}, tc.expectedErr)
 		})
 	}
 }
@@ -179,7 +167,7 @@ func TestUpdatePassword(t *testing.T) {
 		id          int64
 		oldPassword string
 		newPassword string
-		setupMocks  func(repo *RepositoryMock, hash *PasswordHasherMock)
+		setupMock   func(*RepositoryMock, *PasswordHasherMock)
 		expectedErr error
 	}{
 		{
@@ -187,7 +175,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 				hash.On("GenerateFromPassword", "newpassword").Return("newhash", nil)
@@ -200,7 +188,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, _ *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(user.User{}, repoErr)
 			},
 			expectedErr: repoErr,
@@ -210,7 +198,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "wrongpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "wrongpassword").Return(compareErr)
 			},
@@ -221,7 +209,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
@@ -232,7 +220,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "short",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
@@ -243,7 +231,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "shorter",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
@@ -254,7 +242,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 				hash.On("GenerateFromPassword", "newpassword").Return("", hashErr)
@@ -266,7 +254,7 @@ func TestUpdatePassword(t *testing.T) {
 			id:          1,
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
-			setupMocks: func(repo *RepositoryMock, hash *PasswordHasherMock) {
+			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 				hash.On("GenerateFromPassword", "newpassword").Return("newhash", nil)
@@ -278,22 +266,9 @@ func TestUpdatePassword(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hashGenerator := &PasswordHasherMock{}
-			repo := &RepositoryMock{}
-			hashGenerator.Test(t)
-			repo.Test(t)
-
-			if tc.setupMocks != nil {
-				tc.setupMocks(repo, hashGenerator)
-			}
-
-			srv := user.NewService(repo, hashGenerator)
-			err := srv.UpdatePassword(tc.id, tc.oldPassword, tc.newPassword)
-
-			assert.ErrorIs(t, err, tc.expectedErr)
-
-			hashGenerator.AssertExpectations(t)
-			repo.AssertExpectations(t)
+			runTest(t, tc.setupMock, func(srv *user.Service) error {
+				return srv.UpdatePassword(tc.id, tc.oldPassword, tc.newPassword)
+			}, tc.expectedErr)
 		})
 	}
 }
