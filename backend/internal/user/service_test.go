@@ -54,7 +54,7 @@ func TestCreate(t *testing.T) {
 			name:        "Error: Empty username",
 			username:    "",
 			password:    "password123",
-			expectedErr: user.ErrUsernameRequired,
+			expectedErr: user.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Username contains space",
@@ -127,7 +127,7 @@ func TestUpdateUsername(t *testing.T) {
 			name:        "Error: Empty username",
 			id:          1,
 			newUsername: "",
-			expectedErr: user.ErrUsernameRequired,
+			expectedErr: user.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Username contains space",
