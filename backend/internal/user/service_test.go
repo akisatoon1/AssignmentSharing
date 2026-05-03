@@ -26,7 +26,7 @@ func TestCreate(t *testing.T) {
 			password: "password",
 			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
 				hash.On("GenerateFromPassword", "password").Return("thisisHaaash!", nil)
-				repo.On("Save", user.User{Username: "testuser", PasswordHash: "thisisHaaash!"}).Return(nil)
+				repo.On("Create", user.User{Username: "testuser", PasswordHash: "thisisHaaash!"}).Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -73,7 +73,7 @@ func TestCreate(t *testing.T) {
 			password: "password",
 			setupMocks: func(repo *RepositoryMock, hash *HashGeneratorMock) {
 				hash.On("GenerateFromPassword", "password").Return("thisisHaaash!", nil)
-				repo.On("Save", mock.Anything).Return(repoErr)
+				repo.On("Create", mock.Anything).Return(repoErr)
 			},
 			expectedErr: repoErr,
 		},
