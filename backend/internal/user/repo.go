@@ -1,5 +1,6 @@
 package user
 
+// データを保存したり、取り出したりするため
 type Repository interface {
 	Create(usr User) error
 	Save(usr User) error
