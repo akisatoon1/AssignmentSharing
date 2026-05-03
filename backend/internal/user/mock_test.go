@@ -15,6 +15,11 @@ func (r *RepositoryMock) Create(usr user.User) error {
 	return args.Error(0)
 }
 
+func (r *RepositoryMock) Save(usr user.User) error {
+	args := r.Called(usr)
+	return args.Error(0)
+}
+
 type HashGeneratorMock struct {
 	mock.Mock
 }

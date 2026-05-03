@@ -100,3 +100,69 @@ func TestCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateUsername(t *testing.T) {
+	repoErr := errors.New("repository error")
+
+	tests := []struct {
+		name        string
+		id          int64
+		newUsername string
+		setupMocks  func(repo *RepositoryMock)
+		expectedErr error
+	}{
+		{
+			name:        "Success: Valid update",
+			id:          1,
+			newUsername: "newname",
+			setupMocks: func(repo *RepositoryMock) {
+				repo.On("Save", user.User{ID: 1, Username: "newname"}).Return(nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:        "Error: Empty username",
+			id:          1,
+			newUsername: "",
+			setupMocks:  func(repo *RepositoryMock) {},
+			expectedErr: user.ErrUsernameRequired,
+		},
+		{
+			name:        "Error: Username contains space",
+			id:          1,
+			newUsername: "new name",
+			setupMocks:  func(repo *RepositoryMock) {},
+			expectedErr: user.ErrUsernameInvalid,
+		},
+		{
+			name:        "Error: Repository failure",
+			id:          1,
+			newUsername: "newname",
+			setupMocks: func(repo *RepositoryMock) {
+				repo.On("Save", user.User{ID: 1, Username: "newname"}).Return(repoErr)
+			},
+			expectedErr: repoErr,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hashGenerator := &HashGeneratorMock{}
+			repo := &RepositoryMock{}
+			hashGenerator.Test(t)
+			repo.Test(t)
+
+			if tc.setupMocks != nil {
+				tc.setupMocks(repo)
+			}
+
+			srv := user.NewService(repo, hashGenerator)
+			err := srv.UpdateUsername(tc.id, tc.newUsername)
+
+			assert.ErrorIs(t, err, tc.expectedErr)
+
+			hashGenerator.AssertExpectations(t)
+			repo.AssertExpectations(t)
+		})
+	}
+}
