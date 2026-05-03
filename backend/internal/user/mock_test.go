@@ -1,3 +1,5 @@
+// テストでモックを使用するためのコード
+
 package user_test
 
 import (
