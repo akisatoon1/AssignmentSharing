@@ -23,14 +23,14 @@ type User struct {
 
 type Service struct {
 	repo          Repository
-	hashGenerator HashGenerator
+	hashGenerator PasswordHasher
 }
 
-func NewService(repo Repository, hashGenerator HashGenerator) *Service {
+func NewService(repo Repository, hashGenerator PasswordHasher) *Service {
 	return &Service{repo: repo, hashGenerator: hashGenerator}
 }
 
-type HashGenerator interface {
+type PasswordHasher interface {
 	GenerateFromPassword(password string) (hash string, err error)
 	CompareHashAndPassword(hash, password string) error
 }
