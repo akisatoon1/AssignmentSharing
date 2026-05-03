@@ -4,8 +4,17 @@ package user_test
 
 import (
 	"backend/internal/user"
+	"errors"
 
 	"github.com/stretchr/testify/mock"
+)
+
+// モックから返されるエラーの定義。
+// 依存対象のモジュールがエラーを返したときをテストするため。
+var (
+	hashErr    = errors.New("hash generator error")
+	compareErr = errors.New("compare error")
+	repoErr    = errors.New("repository error")
 )
 
 type RepositoryMock struct {

@@ -1,38 +1,52 @@
+// 入力やモックの振る舞いから、関数の出力やモックへの呼び出しをテストしている。
+
 package user_test
 
 import (
 	"backend/internal/user"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func runTest(t *testing.T, setupMock func(*RepositoryMock, *PasswordHasherMock), run func(*user.Service) error, expectedErr error) {
+// 各テストケースを実行するときの共通のボイラープレートをまとめるための関数
+func runTest(
+	t *testing.T,
+	setupMock func(*RepositoryMock, *PasswordHasherMock),
+	run func(*user.Service) error,
+	expectedErr error) {
 	t.Helper()
 
 	repo := &RepositoryMock{}
 	hash := &PasswordHasherMock{}
+
+	// これがないとモックの呼び出しが失敗したときにパニックを起こす。
+	// パニックを起こすと他のテストが実行されない。
 	repo.Test(t)
 	hash.Test(t)
 
 	if setupMock != nil {
+		// setupMockはモックの振る舞いを定義する関数。
+		// テストケースごとにモックの振る舞いは違うため。
 		setupMock(repo, hash)
 	}
 
 	srv := user.NewService(repo, hash)
+
+	// runはテスト対象の関数を呼び出す関数。
+	// テストケースごとに呼び出すServiceのレシーバ関数は違うため。
 	err := run(srv)
 
 	assert.ErrorIs(t, err, expectedErr)
+
+	// モックの呼び出しを期待していたのに呼び出されなかったときに、
+	// テストが失敗するようにするため。
 	repo.AssertExpectations(t)
 	hash.AssertExpectations(t)
 }
 
 func TestCreate(t *testing.T) {
-	hashErr := errors.New("hash generator error")
-	repoErr := errors.New("repository error")
-
 	tests := []struct {
 		name        string
 		username    string
@@ -96,17 +110,19 @@ func TestCreate(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			runTest(t, tc.setupMock, func(srv *user.Service) error {
-				return srv.Create(tc.username, tc.password)
-			}, tc.expectedErr)
-		})
+		create := func(srv *user.Service) error {
+			return srv.Create(tc.username, tc.password)
+		}
+
+		run := func(t *testing.T) {
+			runTest(t, tc.setupMock, create, tc.expectedErr)
+		}
+
+		t.Run(tc.name, run)
 	}
 }
 
 func TestUpdateUsername(t *testing.T) {
-	repoErr := errors.New("repository error")
-
 	tests := []struct {
 		name        string
 		id          int64
@@ -147,19 +163,21 @@ func TestUpdateUsername(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			runTest(t, tc.setupMock, func(srv *user.Service) error {
-				return srv.UpdateUsername(tc.id, tc.newUsername)
-			}, tc.expectedErr)
-		})
+		updateUsername := func(srv *user.Service) error {
+			return srv.UpdateUsername(tc.id, tc.newUsername)
+		}
+
+		run := func(t *testing.T) {
+			runTest(t, tc.setupMock, updateUsername, tc.expectedErr)
+		}
+
+		t.Run(tc.name, run)
 	}
 }
 
 func TestUpdatePassword(t *testing.T) {
-	hashErr := errors.New("hash generator error")
-	repoErr := errors.New("repository error")
-	compareErr := errors.New("compare error")
-
+	// CompareHashAndPasswordの引数にユーザの現在のパスワードハッシュを渡す。
+	// FindByIDの返り値はUser型であり、すべてのテストケースで同じユーザを返す。
 	currentUser := user.User{ID: 1, PasswordHash: "currenthash"}
 
 	tests := []struct {
@@ -265,10 +283,14 @@ func TestUpdatePassword(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			runTest(t, tc.setupMock, func(srv *user.Service) error {
-				return srv.UpdatePassword(tc.id, tc.oldPassword, tc.newPassword)
-			}, tc.expectedErr)
-		})
+		updatePassword := func(srv *user.Service) error {
+			return srv.UpdatePassword(tc.id, tc.oldPassword, tc.newPassword)
+		}
+
+		run := func(t *testing.T) {
+			runTest(t, tc.setupMock, updatePassword, tc.expectedErr)
+		}
+
+		t.Run(tc.name, run)
 	}
 }
