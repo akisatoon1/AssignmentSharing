@@ -27,7 +27,7 @@ postgresを操作するドライバのみ外部。
 グループにユーザを追加、削除。
 招待URLを持っているユーザがグループに追加される。
 
-ユーザの作成、削除、更新。
+ユーザの作成、更新。
 
 ### 認証
 ユーザネームとパスワードでログイン。クッキーを配布してセッション開始。
@@ -42,7 +42,7 @@ Create, Delete, Update
 ### answer
 Create, List
 ### user
-Create, Delete, Update
+Create, Update
 ### group
 Create, Delete(ユーザがいないとき)
 , AddUser, DeleteUser(user側につくってもよいのかな)
@@ -68,51 +68,10 @@ backend/
 それぞれのpackageにservice.go, repo.go, controller.goのようなファイルを作る。
 
 ## 実装のこだわり
-### Password Hash
-Argon2を使用した。下のサイトを参考にパラメータを設定した。
-最小構成としてメモリ19Mib, 反復回数2, 並列度1。
-[OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id)
-```
-実際のコード
-```
-> これらの構成設定は同等のレベルの防御を提供し、唯一の違いはCPUとRAMの使用量のトレードオフです。
-  より、パフォーマンスに問題があれば、パラメータを変更するかも。
+- Password Hash
+- user.Createのテスト
+- user.Updateはusernameとpasswordを分けた。理由はpasswordを更新するときは元のパスワードを必要にしたため。
 
-また、ソルトも追加した。user.Createのテストより、ハッシュやソルト生成は別パッケージとして切り分けるので、[bcrypt](https://pkg.go.dev/golang.org/x/crypto/bcrypt)
-に提供されているAPIを参考に、saltをAPI利用側で管理しないようにする。よってdbにはsaltカラムは用意しない。
-[参考記事](https://qiita.com/ockeghem/items/d7324d383fb7c104af58)
-[同じく](https://developer.mozilla.org/ja/docs/Glossary/Salt)
-[ソルトの長さ](https://github.com/alexedwards/argon2id#changing-the-parameters)
-
-### user Create()
-user.Createをテストしたい。
-#### 何をテストしたいのか
-入力値の検証ができているのか、ソルトとハッシュ値で保存しているか、
-データベースに保存できているのか、データベースのエラーは返すのか。
-#### テスト設計
-dbに依存しないでテストするために、Repository Interface`Save(usr User)`を用意した。
-目的は、テストを容易にするのと、dbに影響を与えないため。
-- Saveに渡す引数の値で、Username, PasswordHash, PasswordSaltが適切な値か。(正常系)
-- 重要: saltがランダムになっており、passwordHashは平文を推測できないものであるか。
-- usernameの長さが0
-- passwordの強度が弱い(チェック方法はあとで考える), 長さ制限
-- データベース由来のエラーを返すのか。(そもそもそれを定義できていない)
-#### 実装
-t.Runで分けた。理由はSaveに渡される引数をテストする必要がないものもあったりして、汎用的に実装(tests)すると分かりづらくなるから。
-モックを作って、Saveへ渡す引数をチェック。
-チェック項目は、err, Saved(username, hash, salt), でusername passwordの指定。
-[golang test best practice](https://grid.gg/testing-in-go-best-practices-and-tips/)
-車輪の再発明を避けるためにassertとmock(testify)を使った。
-mockの使い方は別の記事でやろう。
-##### salt hashのテスト
-salt, hashはどうやってセキュリティに問題がないのかをチェックするのか。手動で値を見ればわかるが、自動テストにならない。
-わざわざDIするのは過剰だと思っていたが、パスワードの比較でauthのログインでも使うので、hashやsaltの値を取得するのはDIでスタブを作る。
-ここでは与えられたhash, saltがちゃんとRepositoryに保存できていることを確認する。
-別パッケージ(hashと仮定)で提供するAPIを考える。hash計算はログイン、新規登録両方で使うが、salt生成は新規登録のみで使う。
-これは、userとhashのどちらで行うべきか。[bcrypt](https://pkg.go.dev/golang.org/x/crypto/bcrypt)にはCompareHashAndPasswordやGenerateFromPassword
-といったAPIが提供されているし、authやuserは具体的な照合や生成ロジックは負わないようにするため。
-
-#### 依存先のエラーにはどんな種類があるのか
-Repositoryは、ユーザ側(usernameが一意ではない)とdb側に責任があるもので別れる。
-全てのエラーを区別なく返しているのでそれが分からない。Repository側でエラーを抽象化して定義して、
-伝搬させる。Create側でも抽象化する必要はあるのか？
+## サービス層
+操作を実行して結果を返す役割。サービス層に渡す前に認証は済んでいる前提。
+認証もサービス層で行う(sessionidからidを取得など)と、セッション管理パッケージにも依存し、テストが複雑になるから。
