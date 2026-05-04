@@ -80,13 +80,13 @@ func TestCreate(t *testing.T) {
 			name:        "Error: Password too short (7 chars)",
 			username:    "testuser",
 			password:    "1234567",
-			expectedErr: user.ErrPasswordTooShort,
+			expectedErr: user.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: Password too short (empty)",
 			username:    "testuser",
 			password:    "",
-			expectedErr: user.ErrPasswordTooShort,
+			expectedErr: user.ErrInvalidPassword,
 		},
 		{
 			name:     "Error: Hash generator failure",
@@ -220,7 +220,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "wrongpassword").Return(compareErr)
 			},
-			expectedErr: user.ErrInvalidPassword,
+			expectedErr: user.ErrWrongPassword,
 		},
 		{
 			name:        "Error: New password too short (Empty)",
@@ -231,7 +231,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
-			expectedErr: user.ErrPasswordTooShort,
+			expectedErr: user.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: New password too short (5 chars)",
@@ -242,7 +242,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
-			expectedErr: user.ErrPasswordTooShort,
+			expectedErr: user.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: New password too short (7 chars)",
@@ -253,7 +253,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
-			expectedErr: user.ErrPasswordTooShort,
+			expectedErr: user.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: Hash generator failure",

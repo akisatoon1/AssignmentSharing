@@ -14,9 +14,9 @@ import (
 // サービス層で返されるエラーを定義したいが、今は完全に定義できておらず。
 // 現状、RepositoryやPasswordHasherのエラーはそのまま返すが、後々はラップして返すかもしれない
 var (
-	ErrUsernameInvalid  = errors.New("username cannot contain whitespace")
-	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
-	ErrInvalidPassword  = errors.New("invalid password")
+	ErrUsernameInvalid = errors.New("invalid username: must not be empty and must not contain spaces")
+	ErrInvalidPassword = errors.New("invalid password: must be at least 8 characters")
+	ErrWrongPassword   = errors.New("wrong password")
 )
 
 type User struct {
@@ -61,7 +61,7 @@ func validateUsername(username string) error {
 func validatePassword(password string) error {
 	const minPasswordLength = 8
 	if len(password) < minPasswordLength {
-		return ErrPasswordTooShort
+		return ErrInvalidPassword
 	}
 	return nil
 }
@@ -105,7 +105,7 @@ func (s *Service) UpdatePassword(id int64, oldPassword, newPassword string) erro
 		return err
 	}
 	if err := s.pdHasher.CompareHashAndPassword(usr.PasswordHash, oldPassword); err != nil {
-		return ErrInvalidPassword
+		return ErrWrongPassword
 	}
 	if err := validatePassword(newPassword); err != nil {
 		return err
