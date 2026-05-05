@@ -133,3 +133,91 @@ func TestCreate(t *testing.T) {
 		t.Run(tc.name, run)
 	}
 }
+
+func TestIssueToken(t *testing.T) {
+	tests := []struct {
+		name           string
+		path           string
+		withCookie     bool
+		setupMocks     func(*ServiceMock, *SessionStoreMock)
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Error: no cookie",
+			path:           "/api/groups/1/invite-token",
+			withCookie:     false,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   presentation.ErrUnauthorized.Msg,
+		},
+		{
+			name:       "Error: invalid session",
+			path:       "/api/groups/1/invite-token",
+			withCookie: true,
+			setupMocks: func(_ *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(nil)
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   presentation.ErrUnauthorized.Msg,
+		},
+		{
+			name:       "Error: invalid groupID",
+			path:       "/api/groups/abc/invite-token",
+			withCookie: true,
+			setupMocks: func(_ *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   presentation.ErrInvalidBody.Msg,
+		},
+		{
+			name:       "Error: requester is not a member",
+			path:       "/api/groups/1/invite-token",
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("IssueToken", int64(1), int64(1)).Return("", service.ErrNotMember)
+			},
+			expectedStatus: http.StatusForbidden,
+			expectedBody:   presentation.ErrForbidden.Msg,
+		},
+		{
+			name:       "Error: internal service error",
+			path:       "/api/groups/1/invite-token",
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("IssueToken", int64(1), int64(1)).Return("", serviceErr)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   presentation.ErrInternal.Msg,
+		},
+		{
+			name:       "Success",
+			path:       "/api/groups/1/invite-token",
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("IssueToken", int64(1), int64(1)).Return("invite-token", nil)
+			},
+			expectedStatus: http.StatusCreated,
+			expectedBody:   `"token":"invite-token"`,
+		},
+	}
+
+	for _, tc := range tests {
+		buildRequest := func() *http.Request {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.withCookie {
+				req.AddCookie(&http.Cookie{Name: "session_id", Value: "sess-abc"})
+			}
+			return req
+		}
+
+		run := func(t *testing.T) {
+			runTest(t, tc.setupMocks, buildRequest, tc.expectedStatus, tc.expectedBody)
+		}
+
+		t.Run(tc.name, run)
+	}
+}
