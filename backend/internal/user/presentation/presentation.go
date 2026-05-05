@@ -90,6 +90,29 @@ func (p *Presentation) UpdateUsername(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (p *Presentation) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	id, err := getUserIDFromRequest(r, p.store)
+	if err != nil {
+		httpErrUnauthorized.write(w)
+		return
+	}
+
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpErrInvalidBody.write(w)
+		return
+	}
+
+	if err := p.service.UpdatePassword(id, req.OldPassword, req.NewPassword); err != nil {
+		convertServiceErrToHttpErr(err).write(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func convertServiceErrToHttpErr(srvErr error) httpError {
 	switch {
 	case errors.Is(srvErr, service.ErrUsernameInvalid):
