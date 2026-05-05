@@ -74,6 +74,27 @@ func (p *Presentation) Create(w http.ResponseWriter, r *http.Request) {
 	writeTokenResponse(w, token, http.StatusCreated)
 }
 
+func (p *Presentation) IssueToken(w http.ResponseWriter, r *http.Request) {
+	requesterID, err := getUserIDFromRequest(r, p.store)
+	if err != nil {
+		ErrUnauthorized.write(w)
+		return
+	}
+
+	groupID, err := parseIDFromPath(r, "groupID")
+	if err != nil {
+		ErrInvalidBody.write(w)
+		return
+	}
+
+	token, err := p.service.IssueToken(groupID, requesterID)
+	if err != nil {
+		convertServiceErrToHttpErr(err).write(w)
+		return
+	}
+
+	writeTokenResponse(w, token, http.StatusCreated)
+}
 // レスポンスボディにおいて、Json型でTokenを返す処理が、2つの関数で使われているため共通化。
 func writeTokenResponse(w http.ResponseWriter, token string, statusCode int) {
 	respBody, err := json.Marshal(struct {
@@ -89,6 +110,11 @@ func writeTokenResponse(w http.ResponseWriter, token string, statusCode int) {
 		// TODO: ログを追加
 		return
 	}
+}
+
+func parseIDFromPath(r *http.Request, key string) (int64, error) {
+	s := r.PathValue(key)
+	return strconv.ParseInt(s, 10, 64)
 }
 
 func convertServiceErrToHttpErr(srvErr error) httpError {
