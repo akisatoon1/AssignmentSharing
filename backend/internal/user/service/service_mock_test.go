@@ -1,9 +1,9 @@
 // テストでモックを使用するためのコード
 
-package user_test
+package service_test
 
 import (
-	"backend/internal/user"
+	"backend/internal/user/service"
 	"errors"
 
 	"github.com/stretchr/testify/mock"
@@ -21,19 +21,19 @@ type RepositoryMock struct {
 	mock.Mock
 }
 
-func (r *RepositoryMock) Create(usr user.User) error {
+func (r *RepositoryMock) Create(usr service.User) error {
 	args := r.Called(usr)
 	return args.Error(0)
 }
 
-func (r *RepositoryMock) Save(usr user.User) error {
+func (r *RepositoryMock) Save(usr service.User) error {
 	args := r.Called(usr)
 	return args.Error(0)
 }
 
-func (r *RepositoryMock) FindByID(id int64) (user.User, error) {
+func (r *RepositoryMock) FindByID(id int64) (service.User, error) {
 	args := r.Called(id)
-	return args.Get(0).(user.User), args.Error(1)
+	return args.Get(0).(service.User), args.Error(1)
 }
 
 type PasswordHasherMock struct {

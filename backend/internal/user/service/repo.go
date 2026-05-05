@@ -1,4 +1,4 @@
-package user
+package service
 
 // データを保存したり、取り出したりするため
 type Repository interface {

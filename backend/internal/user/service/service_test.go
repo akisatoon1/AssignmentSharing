@@ -1,9 +1,9 @@
 // 入力やモックの振る舞いから、関数の出力やモックへの呼び出しをテストしている。
 
-package user_test
+package service_test
 
 import (
-	"backend/internal/user"
+	"backend/internal/user/service"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +14,7 @@ import (
 func runTest(
 	t *testing.T,
 	setupMock func(*RepositoryMock, *PasswordHasherMock),
-	run func(*user.Service) error,
+	run func(*service.Service) error,
 	expectedErr error) {
 	t.Helper()
 
@@ -32,7 +32,7 @@ func runTest(
 		setupMock(repo, hash)
 	}
 
-	srv := user.NewService(repo, hash)
+	srv := service.NewService(repo, hash)
 
 	// runはテスト対象の関数を呼び出す関数。
 	// テストケースごとに呼び出すServiceのレシーバ関数は違うため。
@@ -60,7 +60,7 @@ func TestCreate(t *testing.T) {
 			password: "password",
 			setupMock: func(repo *RepositoryMock, hash *PasswordHasherMock) {
 				hash.On("GenerateFromPassword", "password").Return("thisisHaaash!", nil)
-				repo.On("Create", user.User{Username: "testuser", PasswordHash: "thisisHaaash!"}).Return(nil)
+				repo.On("Create", service.User{Username: "testuser", PasswordHash: "thisisHaaash!"}).Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -68,25 +68,25 @@ func TestCreate(t *testing.T) {
 			name:        "Error: Empty username",
 			username:    "",
 			password:    "password123",
-			expectedErr: user.ErrUsernameInvalid,
+			expectedErr: service.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Username contains space",
 			username:    "test user",
 			password:    "password123",
-			expectedErr: user.ErrUsernameInvalid,
+			expectedErr: service.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Password too short (7 chars)",
 			username:    "testuser",
 			password:    "1234567",
-			expectedErr: user.ErrInvalidPassword,
+			expectedErr: service.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: Password too short (empty)",
 			username:    "testuser",
 			password:    "",
-			expectedErr: user.ErrInvalidPassword,
+			expectedErr: service.ErrInvalidPassword,
 		},
 		{
 			name:     "Error: Hash generator failure",
@@ -110,7 +110,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		create := func(srv *user.Service) error {
+		create := func(srv *service.Service) error {
 			return srv.Create(tc.username, tc.password)
 		}
 
@@ -135,7 +135,7 @@ func TestUpdateUsername(t *testing.T) {
 			id:          1,
 			newUsername: "newname",
 			setupMock: func(repo *RepositoryMock, _ *PasswordHasherMock) {
-				repo.On("Save", user.User{ID: 1, Username: "newname"}).Return(nil)
+				repo.On("Save", service.User{ID: 1, Username: "newname"}).Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -143,27 +143,27 @@ func TestUpdateUsername(t *testing.T) {
 			name:        "Error: Empty username",
 			id:          1,
 			newUsername: "",
-			expectedErr: user.ErrUsernameInvalid,
+			expectedErr: service.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Username contains space",
 			id:          1,
 			newUsername: "new name",
-			expectedErr: user.ErrUsernameInvalid,
+			expectedErr: service.ErrUsernameInvalid,
 		},
 		{
 			name:        "Error: Repository failure",
 			id:          1,
 			newUsername: "newname",
 			setupMock: func(repo *RepositoryMock, _ *PasswordHasherMock) {
-				repo.On("Save", user.User{ID: 1, Username: "newname"}).Return(repoErr)
+				repo.On("Save", service.User{ID: 1, Username: "newname"}).Return(repoErr)
 			},
 			expectedErr: repoErr,
 		},
 	}
 
 	for _, tc := range tests {
-		updateUsername := func(srv *user.Service) error {
+		updateUsername := func(srv *service.Service) error {
 			return srv.UpdateUsername(tc.id, tc.newUsername)
 		}
 
@@ -178,7 +178,7 @@ func TestUpdateUsername(t *testing.T) {
 func TestUpdatePassword(t *testing.T) {
 	// CompareHashAndPasswordの引数にユーザの現在のパスワードハッシュを渡す。
 	// FindByIDの返り値はUser型であり、すべてのテストケースで同じユーザを返す。
-	currentUser := user.User{ID: 1, PasswordHash: "currenthash"}
+	currentUser := service.User{ID: 1, PasswordHash: "currenthash"}
 
 	tests := []struct {
 		name        string
@@ -197,7 +197,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 				hash.On("GenerateFromPassword", "newpassword").Return("newhash", nil)
-				repo.On("Save", user.User{ID: 1, PasswordHash: "newhash"}).Return(nil)
+				repo.On("Save", service.User{ID: 1, PasswordHash: "newhash"}).Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -207,7 +207,7 @@ func TestUpdatePassword(t *testing.T) {
 			oldPassword: "oldpassword",
 			newPassword: "newpassword",
 			setupMock: func(repo *RepositoryMock, _ *PasswordHasherMock) {
-				repo.On("FindByID", int64(1)).Return(user.User{}, repoErr)
+				repo.On("FindByID", int64(1)).Return(service.User{}, repoErr)
 			},
 			expectedErr: repoErr,
 		},
@@ -220,7 +220,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "wrongpassword").Return(compareErr)
 			},
-			expectedErr: user.ErrWrongPassword,
+			expectedErr: service.ErrWrongPassword,
 		},
 		{
 			name:        "Error: New password too short (Empty)",
@@ -231,7 +231,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
-			expectedErr: user.ErrInvalidPassword,
+			expectedErr: service.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: New password too short (5 chars)",
@@ -242,7 +242,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
-			expectedErr: user.ErrInvalidPassword,
+			expectedErr: service.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: New password too short (7 chars)",
@@ -253,7 +253,7 @@ func TestUpdatePassword(t *testing.T) {
 				repo.On("FindByID", int64(1)).Return(currentUser, nil)
 				hash.On("CompareHashAndPassword", "currenthash", "oldpassword").Return(nil)
 			},
-			expectedErr: user.ErrInvalidPassword,
+			expectedErr: service.ErrInvalidPassword,
 		},
 		{
 			name:        "Error: Hash generator failure",
@@ -283,7 +283,7 @@ func TestUpdatePassword(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		updatePassword := func(srv *user.Service) error {
+		updatePassword := func(srv *service.Service) error {
 			return srv.UpdatePassword(tc.id, tc.oldPassword, tc.newPassword)
 		}
 
