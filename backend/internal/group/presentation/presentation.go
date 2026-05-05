@@ -120,6 +120,31 @@ func (p *Presentation) Join(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (p *Presentation) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	requesterID, err := getUserIDFromRequest(r, p.store)
+	if err != nil {
+		ErrUnauthorized.write(w)
+		return
+	}
+
+	groupID, err := parseIDFromPath(r, "groupID")
+	if err != nil {
+		ErrInvalidBody.write(w)
+		return
+	}
+	targetUserID, err := parseIDFromPath(r, "userID")
+	if err != nil {
+		ErrInvalidBody.write(w)
+		return
+	}
+
+	if err := p.service.DeleteUser(groupID, requesterID, targetUserID); err != nil {
+		convertServiceErrToHttpErr(err).write(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // レスポンスボディにおいて、Json型でTokenを返す処理が、2つの関数で使われているため共通化。
 func writeTokenResponse(w http.ResponseWriter, token string, statusCode int) {
 	respBody, err := json.Marshal(struct {
