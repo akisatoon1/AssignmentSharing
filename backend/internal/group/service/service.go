@@ -77,3 +77,14 @@ func (s *Service) IssueToken(groupID int64, requesterID int64) (string, error) {
 	}
 	return s.tokenStore.CreateToken(groupID)
 }
+
+// トークンを知っているもののみがグループに参加できる。
+func (s *Service) AddUser(token string, userID int64) error {
+	groupID := s.tokenStore.GetGroupIDByToken(token)
+	if groupID == nil {
+		return ErrInvalidToken
+	}
+	// groupIDやuserIDが有効かどうかはリポジトリで検証できる。
+	// groupID or userIDがないときや、すでにユーザがメンバーになっているとき。
+	return s.repo.AddMember(*groupID, userID)
+}
