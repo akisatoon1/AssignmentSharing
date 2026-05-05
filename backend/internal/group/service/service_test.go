@@ -249,3 +249,69 @@ func TestAddUser(t *testing.T) {
 		t.Run(tc.name, run)
 	}
 }
+
+func TestDeleteUser(t *testing.T) {
+	tests := []struct {
+		name        string
+		groupID     int64
+		requesterID int64
+		targetID    int64
+		setupMock   func(*RepositoryMock, *TokenStoreMock)
+		expectedErr error
+	}{
+		{
+			name:        "Success",
+			groupID:     1,
+			requesterID: 10,
+			targetID:    2,
+			setupMock: func(repo *RepositoryMock, _ *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(true, nil)
+				repo.On("RemoveMember", int64(1), int64(2)).Return(nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:        "Error: requester is not a member",
+			groupID:     1,
+			requesterID: 10,
+			targetID:    2,
+			setupMock: func(repo *RepositoryMock, _ *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(false, nil)
+			},
+			expectedErr: service.ErrNotMember,
+		},
+		{
+			name:        "Error: IsMember repository failure",
+			groupID:     1,
+			requesterID: 10,
+			targetID:    2,
+			setupMock: func(repo *RepositoryMock, _ *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(false, repoErr)
+			},
+			expectedErr: repoErr,
+		},
+		{
+			name:        "Error: RemoveMember repository failure",
+			groupID:     1,
+			requesterID: 10,
+			targetID:    2,
+			setupMock: func(repo *RepositoryMock, _ *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(true, nil)
+				repo.On("RemoveMember", int64(1), int64(2)).Return(repoErr)
+			},
+			expectedErr: repoErr,
+		},
+	}
+
+	for _, tc := range tests {
+		deleteUser := func(srv *service.Service) error {
+			return srv.DeleteUser(tc.groupID, tc.requesterID, tc.targetID)
+		}
+
+		run := func(t *testing.T) {
+			runTest(t, tc.setupMock, deleteUser, tc.expectedErr)
+		}
+
+		t.Run(tc.name, run)
+	}
+}
