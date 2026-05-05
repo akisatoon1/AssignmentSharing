@@ -134,3 +134,66 @@ func TestCreate(t *testing.T) {
 		t.Run(tc.name, run)
 	}
 }
+
+func TestIssueToken(t *testing.T) {
+	tests := []struct {
+		name          string
+		groupID       int64
+		requesterID   int64
+		setupMock     func(*RepositoryMock, *TokenStoreMock)
+		expectedToken string
+		expectedErr   error
+	}{
+		{
+			name:        "Success",
+			groupID:     1,
+			requesterID: 10,
+			setupMock: func(repo *RepositoryMock, ts *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(true, nil)
+				ts.On("CreateToken", int64(1)).Return("invite-token", nil)
+			},
+			expectedToken: "invite-token",
+			expectedErr:   nil,
+		},
+		{
+			name:        "Error: requester is not a member",
+			groupID:     1,
+			requesterID: 10,
+			setupMock: func(repo *RepositoryMock, _ *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(false, nil)
+			},
+			expectedErr: service.ErrNotMember,
+		},
+		{
+			name:        "Error: IsMember repository failure",
+			groupID:     1,
+			requesterID: 10,
+			setupMock: func(repo *RepositoryMock, _ *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(false, repoErr)
+			},
+			expectedErr: repoErr,
+		},
+		{
+			name:        "Error: CreateToken failure",
+			groupID:     1,
+			requesterID: 10,
+			setupMock: func(repo *RepositoryMock, ts *TokenStoreMock) {
+				repo.On("IsMember", int64(1), int64(10)).Return(true, nil)
+				ts.On("CreateToken", int64(1)).Return("", tokenErr)
+			},
+			expectedErr: tokenErr,
+		},
+	}
+
+	for _, tc := range tests {
+		issueToken := func(srv *service.Service) (string, error) {
+			return srv.IssueToken(tc.groupID, tc.requesterID)
+		}
+
+		run := func(t *testing.T) {
+			runTestString(t, tc.setupMock, issueToken, tc.expectedToken, tc.expectedErr)
+		}
+
+		t.Run(tc.name, run)
+	}
+}
