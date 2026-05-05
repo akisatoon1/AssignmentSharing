@@ -219,3 +219,111 @@ func TestUpdateUsername(t *testing.T) {
 		t.Run(tc.name, run)
 	}
 }
+
+func TestUpdatePassword(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           string
+		withCookie     bool
+		setupMocks     func(*ServiceMock, *SessionStoreMock)
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Error: no cookie",
+			body:           `{"old_password":"oldpass","new_password":"newpass123"}`,
+			withCookie:     false,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   "unauthorized",
+		},
+		{
+			name:       "Error: invalid session",
+			body:       `{"old_password":"oldpass","new_password":"newpass123"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(nil)
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   "unauthorized",
+		},
+		{
+			name:       "Error: malformed JSON",
+			body:       `{bad json`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "invalid request body",
+		},
+		{
+			name:       "Success",
+			body:       `{"old_password":"oldpass","new_password":"newpass123"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("UpdatePassword", int64(1), "oldpass", "newpass123").Return(nil)
+			},
+			expectedStatus: http.StatusNoContent,
+		},
+		{
+			name:       "Error: ErrWrongPassword",
+			body:       `{"old_password":"wrongpass","new_password":"newpass123"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("UpdatePassword", int64(1), "wrongpass", "newpass123").Return(service.ErrWrongPassword)
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   "wrong password",
+		},
+		{
+			name:       "Error: ErrInvalidPassword",
+			body:       `{"old_password":"oldpass","new_password":"short"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("UpdatePassword", int64(1), "oldpass", "short").Return(service.ErrInvalidPassword)
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "invalid password: must be at least 8 characters",
+		},
+		{
+			name:       "Error: internal service error",
+			body:       `{"old_password":"oldpass","new_password":"newpass123"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("UpdatePassword", int64(1), "oldpass", "newpass123").Return(serviceErr)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   "internal server error",
+		},
+	}
+
+	for _, tc := range tests {
+		buildRequest := func() *http.Request {
+			req := httptest.NewRequest(
+				http.MethodPatch,
+				"/api/users/password",
+				strings.NewReader(tc.body),
+			)
+			if tc.withCookie {
+				req.AddCookie(&http.Cookie{Name: "session_id", Value: "sess-abc"})
+			}
+			return req
+		}
+
+		run := func(t *testing.T) {
+			runTest(
+				t,
+				tc.setupMocks,
+				buildRequest,
+				tc.expectedStatus,
+				tc.expectedBody,
+			)
+		}
+
+		t.Run(tc.name, run)
+	}
+}
