@@ -95,6 +95,31 @@ func (p *Presentation) IssueToken(w http.ResponseWriter, r *http.Request) {
 
 	writeTokenResponse(w, token, http.StatusCreated)
 }
+
+func (p *Presentation) Join(w http.ResponseWriter, r *http.Request) {
+	userID, err := getUserIDFromRequest(r, p.store)
+	if err != nil {
+		ErrUnauthorized.write(w)
+		return
+	}
+
+	var req struct {
+		Token string `json:"inviteToken"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ErrInvalidBody.write(w)
+		return
+	}
+
+	if err := p.service.AddUser(req.Token, userID); err != nil {
+		convertServiceErrToHttpErr(err).write(w)
+		return
+	}
+	// TODO: 書き込みエラーを把握できず. ミドルウェアを追加するなど
+	// Join関数を抜けるときに書き込まれるため
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // レスポンスボディにおいて、Json型でTokenを返す処理が、2つの関数で使われているため共通化。
 func writeTokenResponse(w http.ResponseWriter, token string, statusCode int) {
 	respBody, err := json.Marshal(struct {
