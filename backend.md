@@ -44,8 +44,7 @@ Create, List
 ### user
 Create, Update
 ### group
-Create, Delete(ユーザがいないとき)
-, AddUser, DeleteUser(user側につくってもよいのかな)
+Create, AddUser, DeleteUser(user側につくってもよいのかな)
 ### auth
 Login, Logout
 ### session
