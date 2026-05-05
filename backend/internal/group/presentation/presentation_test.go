@@ -221,3 +221,90 @@ func TestIssueToken(t *testing.T) {
 		t.Run(tc.name, run)
 	}
 }
+
+func TestJoin(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           string
+		withCookie     bool
+		setupMocks     func(*ServiceMock, *SessionStoreMock)
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Error: no cookie",
+			body:           `{"token":"invite-token"}`,
+			withCookie:     false,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   presentation.ErrUnauthorized.Msg,
+		},
+		{
+			name:       "Error: invalid session",
+			body:       `{"token":"invite-token"}`,
+			withCookie: true,
+			setupMocks: func(_ *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(nil)
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   presentation.ErrUnauthorized.Msg,
+		},
+		{
+			name:       "Error: malformed JSON",
+			body:       `{bad json`,
+			withCookie: true,
+			setupMocks: func(_ *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   presentation.ErrInvalidBody.Msg,
+		},
+		{
+			name:       "Error: invalid token",
+			body:       `{"inviteToken":"invalid-token"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("AddUser", "invalid-token", int64(1)).Return(service.ErrInvalidToken)
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   presentation.ErrInvalidToken.Msg,
+		},
+		{
+			name:       "Error: internal service error",
+			body:       `{"inviteToken":"invite-token"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("AddUser", "invite-token", int64(1)).Return(serviceErr)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   presentation.ErrInternal.Msg,
+		},
+		{
+			name:       "Success",
+			body:       `{"inviteToken":"invite-token"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("AddUser", "invite-token", int64(1)).Return(nil)
+			},
+			expectedStatus: http.StatusNoContent,
+		},
+	}
+
+	for _, tc := range tests {
+		buildRequest := func() *http.Request {
+			req := httptest.NewRequest(http.MethodPost, "/api/groups/join", strings.NewReader(tc.body))
+			if tc.withCookie {
+				req.AddCookie(&http.Cookie{Name: "session_id", Value: "sess-abc"})
+			}
+			return req
+		}
+
+		run := func(t *testing.T) {
+			runTest(t, tc.setupMocks, buildRequest, tc.expectedStatus, tc.expectedBody)
+		}
+
+		t.Run(tc.name, run)
+	}
+}
