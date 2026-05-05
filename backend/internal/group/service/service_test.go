@@ -197,3 +197,55 @@ func TestIssueToken(t *testing.T) {
 		t.Run(tc.name, run)
 	}
 }
+
+func TestAddUser(t *testing.T) {
+	tests := []struct {
+		name        string
+		token       string
+		userID      int64
+		setupMock   func(*RepositoryMock, *TokenStoreMock)
+		expectedErr error
+	}{
+		{
+			name:   "Success",
+			token:  "invite-token",
+			userID: 2,
+			setupMock: func(repo *RepositoryMock, ts *TokenStoreMock) {
+				ts.On("GetGroupIDByToken", "invite-token").Return(int64(1))
+				repo.On("AddMember", int64(1), int64(2)).Return(nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:   "Error: invalid token",
+			token:  "invalid-token",
+			userID: 2,
+			setupMock: func(_ *RepositoryMock, ts *TokenStoreMock) {
+				ts.On("GetGroupIDByToken", "invalid-token").Return(nil)
+			},
+			expectedErr: service.ErrInvalidToken,
+		},
+		{
+			name:   "Error: Repository failure",
+			token:  "invite-token",
+			userID: 2,
+			setupMock: func(repo *RepositoryMock, ts *TokenStoreMock) {
+				ts.On("GetGroupIDByToken", "invite-token").Return(int64(1))
+				repo.On("AddMember", int64(1), int64(2)).Return(repoErr)
+			},
+			expectedErr: repoErr,
+		},
+	}
+
+	for _, tc := range tests {
+		addUser := func(srv *service.Service) error {
+			return srv.AddUser(tc.token, tc.userID)
+		}
+
+		run := func(t *testing.T) {
+			runTest(t, tc.setupMock, addUser, tc.expectedErr)
+		}
+
+		t.Run(tc.name, run)
+	}
+}
