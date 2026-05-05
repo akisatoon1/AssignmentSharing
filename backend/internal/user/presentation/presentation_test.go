@@ -121,3 +121,101 @@ func TestCreate(t *testing.T) {
 		t.Run(tc.name, run)
 	}
 }
+
+func TestUpdateUsername(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           string
+		withCookie     bool
+		setupMocks     func(*ServiceMock, *SessionStoreMock)
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Error: no cookie",
+			body:           `{"username":"newname"}`,
+			withCookie:     false,
+			setupMocks:     func(svc *ServiceMock, store *SessionStoreMock) {},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   "unauthorized",
+		},
+		{
+			name:       "Error: invalid session",
+			body:       `{"username":"newname"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(nil)
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   "unauthorized",
+		},
+		{
+			name:       "Error: malformed JSON",
+			body:       `{bad json`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "invalid request body",
+		},
+		{
+			name:       "Success",
+			body:       `{"username":"newname"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("UpdateUsername", int64(1), "newname").Return(nil)
+			},
+			expectedStatus: http.StatusNoContent,
+		},
+		{
+			name:       "Error: ErrUsernameInvalid",
+			body:       `{"username":"bad name"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("UpdateUsername", int64(1), "bad name").Return(service.ErrUsernameInvalid)
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "invalid username: must not be empty and must not contain spaces",
+		},
+		{
+			name:       "Error: internal service error",
+			body:       `{"username":"newname"}`,
+			withCookie: true,
+			setupMocks: func(svc *ServiceMock, store *SessionStoreMock) {
+				store.On("Get", "sess-abc").Return(&session.Session{UserID: 1})
+				svc.On("UpdateUsername", int64(1), "newname").Return(serviceErr)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   "internal server error",
+		},
+	}
+
+	for _, tc := range tests {
+		buildRequest := func() *http.Request {
+			req := httptest.NewRequest(
+				http.MethodPatch,
+				"/api/users/username",
+				strings.NewReader(tc.body),
+			)
+			if tc.withCookie {
+				req.AddCookie(&http.Cookie{Name: "session_id", Value: "sess-abc"})
+			}
+			return req
+		}
+
+		run := func(t *testing.T) {
+			runTest(
+				t,
+				tc.setupMocks,
+				buildRequest,
+				tc.expectedStatus,
+				tc.expectedBody,
+			)
+		}
+
+		t.Run(tc.name, run)
+	}
+}
