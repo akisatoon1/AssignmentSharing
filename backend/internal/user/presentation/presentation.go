@@ -68,6 +68,28 @@ func (p *Presentation) Create(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+func (p *Presentation) UpdateUsername(w http.ResponseWriter, r *http.Request) {
+	id, err := getUserIDFromRequest(r, p.store)
+	if err != nil {
+		httpErrUnauthorized.write(w)
+		return
+	}
+
+	var req struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpErrInvalidBody.write(w)
+		return
+	}
+
+	if err := p.service.UpdateUsername(id, req.Username); err != nil {
+		convertServiceErrToHttpErr(err).write(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func convertServiceErrToHttpErr(srvErr error) httpError {
 	switch {
 	case errors.Is(srvErr, service.ErrUsernameInvalid):
