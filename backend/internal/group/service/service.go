@@ -64,3 +64,16 @@ func (s *Service) Create(name string, userID int64) (string, error) {
 	}
 	return s.tokenStore.CreateToken(groupID)
 }
+
+// 既存グループの招待tokenを発行する。
+// リクエスト者がグループに所属していることが必要。
+func (s *Service) IssueToken(groupID int64, requesterID int64) (string, error) {
+	ok, err := s.repo.IsMember(groupID, requesterID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", ErrNotMember
+	}
+	return s.tokenStore.CreateToken(groupID)
+}
