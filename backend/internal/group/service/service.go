@@ -88,3 +88,18 @@ func (s *Service) AddUser(token string, userID int64) error {
 	// groupID or userIDがないときや、すでにユーザがメンバーになっているとき。
 	return s.repo.AddMember(*groupID, userID)
 }
+
+// グループからユーザを削除する。
+// 削除要請をするユーザが同じグループに所属していることが必要である。
+func (s *Service) DeleteUser(groupID int64, requesterID int64, targetUserID int64) error {
+	ok, err := s.repo.IsMember(groupID, requesterID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotMember
+	}
+	// groupIDやtargetUserIDが有効かどうかはリポジトリで検証できる。
+	// groupID or targetUserIDがないとき。
+	return s.repo.RemoveMember(groupID, targetUserID)
+}
